@@ -265,5 +265,47 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        best_move = [-1, -1]
+
+        #if this is the last iteration, return
+        if depth == 0:
+            return self.score(game, self), [-1, -1]
+
+        # find our possible moves from board state
+        moves = game.get_legal_moves(game.active_player)
+
+        # initialize minmax depending on active player
+        if maximizing_player == True:
+            minmax_score = float("-inf")
+            new_alpha = alpha
+        else:
+            minmax_score = float("inf")
+            new_beta = beta
+
+        # for each legal move, consider new board state
+        for move in moves:
+            next_game = game.forecast_move(move)
+
+            if maximizing_player:
+                score, _ = self.alphabeta(next_game, depth-1, new_alpha, beta, not maximizing_player)
+                if score >= minmax_score:
+                    minmax_score = score
+                    new_alpha = minmax_score
+                    best_move = move
+                # the parent node (a minimizing node) will
+                # not pick this node or any of its children
+                if minmax_score >= beta:
+                    return minmax_score, best_move
+
+            if not maximizing_player:
+                score, _ = self.alphabeta(next_game, depth-1, alpha, new_beta, not maximizing_player)
+                if score <= minmax_score:
+                    minmax_score = score
+                    new_beta = minmax_score
+                    best_move = move
+                # the parent node (a maximizing node) will
+                # not pick this node or any of its children
+                if minmax_score <= alpha:
+                    return minmax_score, best_move
+
+        return minmax_score, best_move
