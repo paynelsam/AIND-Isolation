@@ -7,14 +7,151 @@ You must test your agent's strength against a set of agents with known
 relative strength using tournament.py and include the results in your report.
 """
 import random
-
+import sys
 
 class Timeout(Exception):
     """Subclass base exception for code clarity."""
     pass
 
+#####################################################################
+# Helper functions for board symmetry
+#####################################################################
 
-def custom_score(game, player):
+def flip_game(game, orientation) :
+    """ flips the board state of the game """
+    new_game = game.copy()
+
+    # flip around diagnal center
+    if orientation == 'diagonal':
+        # reverse columns
+        new_game.__board_state__ = new_game.__board_state__[::-1]
+        # reverse rows
+        i = 0
+        for row in new_game.__board_state__:
+            new_row = row[::-1]
+            new_game.__board_state__[i] = new_row
+            i = i + 1
+        # reverse player positions
+        for p in new_game.__last_player_move__:
+            pos = new_game.__last_player_move__[p]
+            new_y = new_game.height - 1 - pos[0]
+            new_x = new_game.width - 1 - pos[1]
+            new_game.__last_player_move__[p] = (new_y, new_x)
+        return new_game
+    # flip around horizontal center
+    elif (orientation == 'horizontal'):
+        # reverse columns
+        new_game.__board_state__ = new_game.__board_state__[::-1]
+        # reverse player positions
+        for p in new_game.__last_player_move__:
+            pos = new_game.__last_player_move__[p]
+            new_y = new_game.height - 1 - pos[0]
+            new_game.__last_player_move__[p] = (new_y, pos[1])
+        return new_game
+    # flip around vertical center
+    elif (orientation == 'vertical'):
+        # reverse rows
+        i = 0
+        for row in new_game.__board_state__:
+            new_row = row[::-1]
+            new_game.__board_state__[i] = new_row
+            i = i + 1
+        # reverse player positions
+        for p in new_game.__last_player_move__:
+            pos = new_game.__last_player_move__[p]
+            new_x = new_game.width - 1 - pos[1]
+            new_game.__last_player_move__[p] = (pos[0], new_x)
+        return new_game
+    else:
+        print("flip_game: WARNING: UNRECOGNIZED SYMBOL:", orientation)
+        return game
+
+def check_h_symmetry(game):
+    """ returns True if the board is symetric horizontally"""
+    symmetry = True
+    # create flipped game
+    flipped_game = flip_game(game, 'horizontal')
+    if game.height % 2 == 1:
+        half_height = int(game.height/2 + 1)
+    else:
+        half_height = int(game.height/2)
+
+    # compare blocked out spaces
+    for i in range(half_height):
+        for j in range(game.width):
+            if not game.__board_state__[i][j] and not flipped_game.__board_state__[i][j]:
+                pass
+            elif game.__board_state__[i][j] and flipped_game.__board_state__[i][j]:
+                pass
+            else:
+                symmetry = False
+
+    # compare player locations for symmetry
+    if (flipped_game.get_player_location(flipped_game.active_player) != game.get_player_location(game.inactive_player)):
+        symmetry = False
+    return symmetry
+
+
+def check_v_symmetry(game):
+    """ returns True if the board is symetric vertically"""
+    symmetry = True
+    # create flipped game
+    flipped_game = flip_game(game, 'vertical')
+    if game.height % 2 == 1:
+        half_width = int(game.height/2 + 1)
+    else:
+        half_width = int(game.height/2)
+
+    # compare blocked out spaces
+    for i in range(game.height):
+        for j in range(half_width):
+            if not game.__board_state__[i][j] and not flipped_game.__board_state__[i][j]:
+                pass
+            elif game.__board_state__[i][j] and flipped_game.__board_state__[i][j]:
+                pass
+            else:
+                symmetry = False
+
+    # compare player locations for symmetry
+    if (flipped_game.get_player_location(flipped_game.active_player) != game.get_player_location(game.inactive_player)):
+        symmetry = False
+    return symmetry
+
+def check_d_symmetry(game):
+    """ returns True if the board is symetric diagonally"""
+    symmetry = True
+    # create flipped game
+    flipped_game = flip_game(game, 'diagonal')
+    if game.height % 2 == 1:
+        half_width = int(game.height/2 + 1)
+    else:
+        half_width = int(game.height/2)
+
+    # compare blocked out spaces
+    for i in range(game.height):
+        for j in range(half_width):
+            if not game.__board_state__[i][j] and not flipped_game.__board_state__[i][j]:
+                pass
+            elif game.__board_state__[i][j] and flipped_game.__board_state__[i][j]:
+                pass
+            else:
+                symmetry = False
+
+    # compare player locations for symmetry
+    if (flipped_game.get_player_location(flipped_game.active_player) != game.get_player_location(game.inactive_player)):
+        symmetry = False
+    return symmetry
+
+def is_symmetric(game) :
+
+    return check_h_symmetry(game) or check_v_symmetry(game) or check_d_symmetry(game)
+
+#####################################################################
+# Assignment Code: custom scores
+#####################################################################
+
+#custom_score_weighted
+def custom_score_weighted(game, player):
     """Calculate the heuristic value of a game state from the point of view
     of the given player.
 
@@ -36,10 +173,121 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
+    if game.is_winner(player):
+        return float("inf")
 
-    # TODO: finish this function!
-    raise NotImplementedError
+    if game.is_loser(player):
+        return float("-inf")
 
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+
+    return float(9.0 * own_moves - 1.0 * opp_moves)
+
+def custom_score_opponent(game, player):
+    """ same function as as custom_player(), but only the opponent's move count
+    is taken into consideration """
+    if game.is_winner(player):
+        return float("inf")
+
+    if game.is_loser(player):
+        return float("-inf")
+
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+
+    return float(-1 * opp_moves)
+def custom_score_distance(game, player):
+    """
+    same function as custom_(), but also considers the player's
+    euclidean distance from the other player
+    """
+    if game.is_winner(player):
+        return float("inf")
+
+    if game.is_loser(player):
+        return float("-inf")
+
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+
+    own_pos = game.get_player_location(player)
+    opp_pos = game.get_player_location(game.get_opponent(player))
+    dist = (own_pos[0] - opp_pos[0])^2 + (own_pos[1] - opp_pos[1])^2
+
+    return own_moves - opp_moves + .01 * dist
+
+def custom_score_symmetry(game, player):
+    """
+    same function as custom_score() but also favors symmetric moves when
+    playing second on a symmetric board. Falls back on custom_score() otherwise
+    """
+    if game.is_winner(player):
+        return float("inf")
+
+    if game.is_loser(player):
+        return float("-inf")
+
+    # for odd moves, examine if symmetry could be broken
+    if (game.move_count % 2 == 1 and       # second player's turn
+        game.__active_player__ == player): # we're up - we went second
+        # for future moves, consider if we can copy
+        for move in game.get_legal_moves(game.__active_player__):
+            if is_symmetric(game.forecast_move(move)):
+                # symmetry can be maintained, this is a good state for 2nd player
+                return 100
+
+    # return 100 if we're second and can copy the opponent's move
+    if (game.move_count % 2 == 0 and         # our move followed our opponent
+        game.__active_player__ != player and # it's the opponent's move
+        is_symmetric(game)):                 # we made the board symmetric
+            return 100
+
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+
+    own_pos = game.get_player_location(player)
+    opp_pos = game.get_player_location(game.get_opponent(player))
+
+    return float(own_moves - opp_moves)
+
+def custom_score(game, player):
+    """
+    same function as custom_score() but also favors symmetric moves when
+    playing second on an even sized symmetric board. Falls back on custom_score() otherwise
+    """
+    if game.is_winner(player):
+        return float("inf")
+
+    if game.is_loser(player):
+        return float("-inf")
+    if (not game.height % 2 or not game.width %2) :
+        # for odd moves, examine if symmetry could be broken
+        if (game.move_count % 2 == 1 and       # second player's turn
+            game.__active_player__ == player): # we're up - we went second
+            # for future moves, consider if we can copy
+            for move in game.get_legal_moves(game.__active_player__):
+                if is_symmetric(game.forecast_move(move)):
+                    # symmetry can be maintained, this is a good state for 2nd player
+                    return 100
+
+        # return 100 if we're second and can copy the opponent's move
+        if (game.move_count % 2 == 0 and         # our move followed our opponent
+            game.__active_player__ != player and # it's the opponent's move
+            is_symmetric(game)):                 # we made the board symmetric
+                return 100
+
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+
+    own_pos = game.get_player_location(player)
+    opp_pos = game.get_player_location(game.get_opponent(player))
+    dist = (own_pos[0] - opp_pos[0])^2 + (own_pos[1] - opp_pos[1])^2
+
+    return float(0.1 * own_moves - 0.9 * opp_moves - .01 * dist)
+
+#####################################################################
+# Assignment Code: CustomPlayer Class
+#####################################################################
 
 class CustomPlayer:
     """Game-playing agent that chooses a move using your evaluation function
